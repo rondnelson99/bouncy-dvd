@@ -51,8 +51,12 @@ Reset::
 	dec b
 	jr nz, .copyOAMDMA
 
-	FAIL "Edit to set palettes here"
 	; CGB palettes maybe, DMG ones always
+
+	ld a, %11100100
+	ld [hBGP],a
+	ld [hOBP0],a
+	ld [hOBP1],a
 
 	; You will also need to reset your handlers' variables below
 	; I recommend reading through, understanding, and customizing this file
@@ -60,16 +64,102 @@ Reset::
 	; so it's strongly tied to your own game.
 	; I don't recommend clearing large amounts of RAM, nor to init things
 	; here that can be initialized later.
+	
+	xor a
+.zeroWRAM
+    ld hl,$C000 ; start of WRAM
+    ld bc, $2000 - STACK_SIZE ;8KB of RAM, dont erase stack
+	rst Memset
+
+	; Clear OAM, so it doesn't display garbage
+	; This will get committed to hardware OAM after the end of the first
+	; frame, but the hardware doesn't display it, so that's fine.
+	ld hl, wShadowOAM
+	ld c, NB_SPRITES * 4
+	xor a
+	rst MemsetSmall
+
+.copySprites
+    ld hl, $8000;start of VRAM
+    ld de, SpriteTiles
+    ld c, SpriteTilesEnd - SpriteTiles
+	rst MemcpySmall
+
+SetUpSprites:
+    ld hl, wShadowOAM
+    ld b,13 ;13 metasprites
+    xor a ; a is literally only used as a shortcut for 0 here
+	;and c isn't even used at all
+.setUpMetaSpriteLoop
+    lb de,3,0; 3 sprites per metasprite. e counts sprite ids, starting with 0
+
+.setUpSpriteLoop
+    inc l;skip y coord
+    inc l;skip x coord
+
+    ld [hl],e ;set tile number
+    inc e;advance 2 tiles
+    inc e
+    inc l
+
+    ld [hl+], a ;load 0. in front of bg, not flipped, palette 0
+
+    dec d
+    jr nz, .setUpSpriteLoop
+
+	dec b
+	jr nz,.setUpMetaSpriteLoop
+
+
+	ld b,b
+SetUpDvdLogoLoc:
+    ld hl,wDvdLogoLoc
+	ld de,$03D4; just get some data from the the middle of the rom. That'll be random enough.
+	lb bc,1,13 ;2 13 metasprites. b is just a shortcut for the velocities, which will all be set to 1.
+.loadRandomData
+	ld a, [de]
+	and %01111111;mask bit 7 so it cant be more than 127
+	add 16;get it onto the screen
+	ld [hl+],a ; y pos
+	inc e
+
+	rra 
+	sbc a
+	ccf
+	adc 0
+	ld [hl+], a ;y-velocity
+
+	ld a, [de]; x pos
+	and %01111111
+	add 16;get it onto the screen
+	ld [hl+],a 
+	inc e
+
+	rra 
+	sbc a
+	ccf
+	adc 0
+	ld [hl+],a; x-velocity
+
+	dec c
+	jr nz,.loadRandomData
+
+
+    call SetMetaspriteCoords
+
+
+	
 
 	; Reset variables necessary for the VBlank handler to function correctly
 	; But only those for now
 	xor a
 	ldh [hVBlankFlag], a
-	ldh [hOAMHigh], a
 	ldh [hCanSoftReset], a
+	ldh [hOAMHigh], a
 	dec a ; ld a, $FF
 	ldh [hHeldKeys], a
 
+	
 	; Load the correct ROM bank for later
 	; Important to do it before enabling interrupts
 	ld a, BANK(Intro)
@@ -88,20 +178,12 @@ Reset::
 	; xor a
 	ldh [hSCY], a
 	ldh [hSCX], a
-	ld a, LCDCF_ON | LCDCF_BGON
+	;
+	ld a, %10000110 ;screen on, 8x16 sprites, everything else off
 	ldh [hLCDC], a
 	; And turn the LCD on!
 	ldh [rLCDC], a
 
-	; Clear OAM, so it doesn't display garbage
-	; This will get committed to hardware OAM after the end of the first
-	; frame, but the hardware doesn't display it, so that's fine.
-	ld hl, wShadowOAM
-	ld c, NB_SPRITES * 4
-	xor a
-	rst MemsetSmall
-	ld a, h ; ld a, HIGH(wShadowOAM)
-	ldh [hOAMHigh], a
 
 	; `Intro`'s bank has already been loaded earlier
 	jp Intro
@@ -143,9 +225,8 @@ wShadowOAM::
 	ds NB_SPRITES * 4
 
 
-FAIL "If not using banked WRAM, then replace $D000 with $E000 and delete this line"
 ; This ensures that the stack is at the very end of WRAM
-SECTION "Stack", WRAM0[$D000 - STACK_SIZE]
+SECTION "Stack", WRAM0[$E000 - STACK_SIZE]
 
 	ds STACK_SIZE
 wStackBottom:

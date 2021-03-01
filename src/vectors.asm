@@ -133,6 +133,7 @@ VBlankHandler:
 	ldh a, [hOBP1]
 	ldh [rOBP1], a
 
+
 	; OAM DMA can occur late in the handler, because it will still work even
 	; outside of VBlank. Sprites just will not appear on the scanline(s)
 	; during which it's running.
@@ -226,7 +227,7 @@ hVBlankFlag:: db
 ; High byte of the address of the OAM buffer to use.
 ; When this is non-zero, the VBlank handler will write that value to rDMA, and
 ; reset it.
-hOAMHigh:: db
+hOAMHigh:: db 
 
 ; Shadow registers for a bunch of hardware regs.
 ; Writing to these causes them to take effect more or less immediately, so these

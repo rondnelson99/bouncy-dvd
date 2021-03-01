@@ -57,10 +57,12 @@ ASFLAGS += -h
 # FIXFLAGS += -s
 
 # Game Boy mode
-# LDFLAGS += -d
+LDFLAGS += -d
 
 # No banked WRAM mode
-# LDFLAGS += -w
+LDFLAGS += -w
 
 # 32k mode
-# LDFLAGS += -t
+ LDFLAGS += -t
+#disable padding for smaller uploads
+  LDFLAGS += -x
