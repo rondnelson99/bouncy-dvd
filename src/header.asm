@@ -122,7 +122,7 @@ SetUpDvdLogoLoc:
 	add 16;get it onto the screen
 	ld [hl+],a ; y pos
 	inc e
-
+ 
 	rra 
 	sbc a
 	ccf
